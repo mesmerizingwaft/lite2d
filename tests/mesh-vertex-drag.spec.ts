@@ -53,6 +53,24 @@ async function pngColorStats(page: import('@playwright/test').Page, color: [numb
   }, color)
 }
 
+async function setDeformValue(page: import('@playwright/test').Page, value: '0' | '0.5' | '1') {
+  const range = page.locator('input[type=range]')
+  await range.fill(value)
+  await expect(page.locator('output')).toHaveText(Number(value).toFixed(2))
+}
+
+async function dragCanvasVertex(page: import('@playwright/test').Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  const canvas = page.locator('canvas')
+  const box = await canvas.boundingBox()
+  expect(box).not.toBeNull()
+  if (!box) return
+
+  await page.mouse.move(box.x + from.x, box.y + from.y)
+  await page.mouse.down()
+  await page.mouse.move(box.x + to.x, box.y + to.y, { steps: 8 })
+  await page.mouse.up()
+}
+
 test('keeps dragged mesh vertices visible after pointer release', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()
@@ -77,4 +95,43 @@ test('keeps dragged mesh vertices visible after pointer release', async ({ page 
   expect(after.pixels).toBeGreaterThan(9000)
   expect(during.bbox?.maxX).toBeGreaterThan(before.bbox?.maxX ?? 0)
   expect(after.bbox?.maxX).toBeGreaterThan(before.bbox?.maxX ?? 0)
+})
+
+test('save value buttons commit the current edit pose for playback', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  await page.locator('input[type=file]').setInputFiles(path.join(process.cwd(), 'samples/base.png'))
+  await expect(page.locator('.part span')).toHaveText(['base.png'])
+
+  const initial = await pngColorStats(page, basePngColor)
+  expect(initial.bbox).not.toBeNull()
+
+  await dragCanvasVertex(page, { x: 289, y: 289 }, { x: 369, y: 249 })
+  const editedValueOnePose = await pngColorStats(page, basePngColor)
+  expect(editedValueOnePose.bbox?.maxX).toBeGreaterThan((initial.bbox?.maxX ?? 0) + 20)
+
+  await page.getByRole('button', { name: 'Save value=1' }).click()
+  await expect(page.locator('.status')).toHaveText('Saved value=1')
+
+  await page.getByRole('button', { name: 'Play' }).click()
+  await expect.poll(async () => (await pngColorStats(page, basePngColor)).bbox?.maxX ?? 0).toBeGreaterThan((initial.bbox?.maxX ?? 0) + 20)
+  await page.getByRole('button', { name: 'Stop' }).click()
+  const stoppedAtZero = await pngColorStats(page, basePngColor)
+  expect(stoppedAtZero.bbox?.maxX).toBeCloseTo(initial.bbox?.maxX ?? 0, 1)
+
+  await dragCanvasVertex(page, { x: 222, y: 289 }, { x: 162, y: 249 })
+  const editedValueZeroPose = await pngColorStats(page, basePngColor)
+  expect(editedValueZeroPose.bbox?.minX).toBeLessThan((initial.bbox?.minX ?? 0) - 20)
+
+  await page.getByRole('button', { name: 'Save value=0' }).click()
+  await expect(page.locator('.status')).toHaveText('Saved value=0')
+  await page.getByRole('button', { name: 'Stop' }).click()
+  const savedZeroPose = await pngColorStats(page, basePngColor)
+  expect(savedZeroPose.bbox?.minX).toBeLessThan((initial.bbox?.minX ?? 0) - 20)
+
+  await setDeformValue(page, '1')
+  const savedOnePose = await pngColorStats(page, basePngColor)
+  expect(savedOnePose.bbox?.maxX).toBeCloseTo(editedValueOnePose.bbox?.maxX ?? 0, 1)
+  expect(savedOnePose.bbox?.minX).toBeGreaterThan((editedValueZeroPose.bbox?.minX ?? 0) + 20)
 })

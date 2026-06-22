@@ -54,10 +54,10 @@ export function PixiViewport() {
         runtimes.current.set(part.id, rt); app.stage.addChild(rt.container)
       }
       for (const [id, rt] of runtimes.current) if (!store.parts.some(p => p.id === id)) { rt.container.destroy({ children: true }); runtimes.current.delete(id) }
-      store.parts.forEach(part => { const rt = runtimes.current.get(part.id); if (rt && !drag.current) syncRuntimePart(rt, part, store.parameterValues, part.id === store.selectedPartId) })
+      store.parts.forEach(part => { const rt = runtimes.current.get(part.id); if (rt && !drag.current) syncRuntimePart(rt, part, store.parameterValues, part.id === store.selectedPartId, store.editVertices[part.id]) })
     }
     run(); return () => { cancelled = true }
-  }, [store.parts, store.parameterValues, store.selectedPartId])
+  }, [store.parts, store.parameterValues, store.selectedPartId, store.editVertices])
 
   return <div className="viewport" ref={host} />
 }

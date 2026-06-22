@@ -30,14 +30,14 @@ export async function createRuntimePart(part: Part): Promise<RuntimePart> {
   return { partId: part.id, container, mesh, handles, vertices: part.mesh.vertices.map(v => ({ ...v })) }
 }
 
-export function syncRuntimePart(rt: RuntimePart, part: Part, parameterValues: Record<string, number>, selected: boolean) {
+export function syncRuntimePart(rt: RuntimePart, part: Part, parameterValues: Record<string, number>, selected: boolean, verticesOverride?: Vec2[]) {
   rt.container.position.set(part.transform.x, part.transform.y)
   rt.container.rotation = part.transform.rotation
   rt.container.scale.set(part.transform.scaleX, part.transform.scaleY)
   rt.container.alpha = part.transform.opacity
   rt.container.visible = part.visible
   rt.container.zIndex = part.zIndex
-  rt.vertices = evaluatePartVertices(part, parameterValues)
+  rt.vertices = verticesOverride?.map(v => ({ ...v })) ?? evaluatePartVertices(part, parameterValues)
   rt.mesh.vertices = flat(rt.vertices)
   rt.handles.clear()
   if (selected && part.visible) {
