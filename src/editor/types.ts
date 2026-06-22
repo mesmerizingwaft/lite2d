@@ -1,0 +1,11 @@
+export type Vec2 = { x: number; y: number }
+export type Transform = { x: number; y: number; rotation: number; scaleX: number; scaleY: number; opacity: number }
+export type MeshData = { vertices: Vec2[]; uvs: Vec2[]; indices: number[] }
+export type MeshKeyform = { parameterId: string; value: number; vertices: Vec2[] }
+export type Part = { id: string; name: string; imageUrl: string; width: number; height: number; visible: boolean; zIndex: number; transform: Transform; mesh: MeshData; keyforms: MeshKeyform[] }
+export type Parameter = { id: string; name: string; min: number; max: number; default: number }
+export type AnimationKey = { time: number; value: number; interpolation: 'linear' | 'step' }
+export type AnimationTrack = { parameterId: string; keys: AnimationKey[] }
+export type Animation = { fps: number; duration: number; tracks: AnimationTrack[] }
+export type Project = { parts: Part[]; parameters: Parameter[]; parameterValues: Record<string, number>; animation: Animation }
+export const PARAM_DEFORM_ID = 'ParamDeform'
