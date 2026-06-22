@@ -7,8 +7,22 @@ export type RuntimePart = { partId: string; container: Container; mesh: MeshSimp
 export const flat = (v: Vec2[]) => new Float32Array(v.flatMap(p => [p.x, p.y]))
 export const uvFlat = (v: Vec2[]) => new Float32Array(v.flatMap(p => [p.x, p.y]))
 
+async function loadImage(url: string): Promise<HTMLImageElement> {
+  const image = new Image()
+  image.src = url
+  if (image.decode) {
+    await image.decode()
+  } else {
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve()
+      image.onerror = () => reject(new Error(`Failed to load image: ${url}`))
+    })
+  }
+  return image
+}
+
 export async function createRuntimePart(part: Part): Promise<RuntimePart> {
-  const texture = await Texture.from(part.imageUrl)
+  const texture = Texture.from(await loadImage(part.imageUrl), true)
   const container = new Container()
   const mesh = new MeshSimple({ texture, vertices: flat(part.mesh.vertices), uvs: uvFlat(part.mesh.uvs), indices: new Uint32Array(part.mesh.indices), topology: 'triangle-list' })
   const handles = new Graphics()
