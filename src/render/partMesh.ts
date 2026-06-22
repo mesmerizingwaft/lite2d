@@ -41,10 +41,9 @@ export function syncRuntimePart(rt: RuntimePart, part: Part, parameterValues: Re
   rt.mesh.vertices = flat(rt.vertices)
   rt.handles.clear()
   if (selected && part.visible) {
-    rt.handles.setStrokeStyle({ width: 1, color: 0x20e0ff, alpha: 0.9 })
     for (let i = 0; i < part.mesh.indices.length; i += 3) {
       const a = rt.vertices[part.mesh.indices[i]], b = rt.vertices[part.mesh.indices[i + 1]], c = rt.vertices[part.mesh.indices[i + 2]]
-      rt.handles.moveTo(a.x, a.y).lineTo(b.x, b.y).lineTo(c.x, c.y).lineTo(a.x, a.y)
+      rt.handles.moveTo(a.x, a.y).lineTo(b.x, b.y).lineTo(c.x, c.y).lineTo(a.x, a.y).stroke({ width: 1, color: 0x20e0ff, alpha: 0.9 })
     }
     rt.vertices.forEach(v => rt.handles.circle(v.x, v.y, 5).fill({ color: 0xffe066 }).stroke({ width: 1, color: 0x222222 }))
   }

@@ -14,7 +14,26 @@ export const useEditorStore = create<State>((set, get) => ({
   movePart: (id, dir) => set(s => ({ parts: s.parts.map(p => p.id === id ? { ...p, zIndex: p.zIndex + dir } : p) })),
   setParameter: (id, value) => set(s => ({ parameterValues: { ...s.parameterValues, [id]: value } })),
   saveKeyform: value => set(s => ({ parts: s.parts.map(p => p.id === s.selectedPartId ? { ...p, keyforms: [...p.keyforms.filter(k => !(k.parameterId === PARAM_DEFORM_ID && k.value === value)), { parameterId: PARAM_DEFORM_ID, value, vertices: p.mesh.vertices.map(v => ({ ...v })) }] } : p) })),
-  updatePartVertices: (id, vertices) => set(s => ({ parts: s.parts.map(p => p.id === id ? { ...p, mesh: { ...p.mesh, vertices: vertices.map(v => ({ ...v })) } } : p) })),
+  updatePartVertices: (id, vertices) => set(s => {
+    const copied = vertices.map(v => ({ ...v }))
+    const currentDeformValue = s.parameterValues[PARAM_DEFORM_ID]
+    const keyformValue = currentDeformValue === 0 || currentDeformValue === 1 ? currentDeformValue : null
+    return {
+      parts: s.parts.map(p => {
+        if (p.id !== id) return p
+
+        let keyforms = p.keyforms
+        if (keyformValue != null) {
+          const updated = { parameterId: PARAM_DEFORM_ID, value: keyformValue, vertices: copied.map(v => ({ ...v })) }
+          keyforms = p.keyforms.some(k => k.parameterId === PARAM_DEFORM_ID && k.value === keyformValue)
+            ? p.keyforms.map(k => k.parameterId === PARAM_DEFORM_ID && k.value === keyformValue ? updated : k)
+            : [...p.keyforms, updated]
+        }
+
+        return { ...p, mesh: { ...p.mesh, vertices: copied.map(v => ({ ...v })) }, keyforms }
+      }),
+    }
+  }),
   play: () => set({ isPlaying: true }), stop: () => set({ isPlaying: false, currentTime: 0, parameterValues: { ...get().parameterValues, ...evaluateAnimation(get().animation, 0) } }),
   setTime: t => set(s => ({ currentTime: t, parameterValues: { ...s.parameterValues, ...evaluateAnimation(s.animation, t) } }))
 }))
