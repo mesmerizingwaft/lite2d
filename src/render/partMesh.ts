@@ -3,7 +3,7 @@ import { hitTestVertex } from '../mesh/hitTestVertex'
 import { evaluatePartVertices } from './evaluateDeformation'
 import type { Part, Vec2 } from '../editor/types'
 
-export type RuntimePart = { partId: string; container: Container; preview: Sprite; mesh: MeshSimple; handles: Graphics; vertices: Vec2[] }
+export type RuntimePart = { partId: string; container: Container; preview: Sprite; mesh: MeshSimple; handles: Graphics; selectionBox: Graphics; vertices: Vec2[] }
 export const flat = (v: Vec2[]) => new Float32Array(v.flatMap(p => [p.x, p.y]))
 export const uvFlat = (v: Vec2[]) => new Float32Array(v.flatMap(p => [p.x, p.y]))
 
@@ -29,8 +29,9 @@ export async function createRuntimePart(part: Part): Promise<RuntimePart> {
   preview.visible = false
   const mesh = new MeshSimple({ texture, vertices: flat(part.mesh.vertices), uvs: uvFlat(part.mesh.uvs), indices: new Uint32Array(part.mesh.indices), topology: 'triangle-list' })
   const handles = new Graphics()
-  container.addChild(preview, mesh, handles)
-  return { partId: part.id, container, preview, mesh, handles, vertices: part.mesh.vertices.map(v => ({ ...v })) }
+  const selectionBox = new Graphics()
+  container.addChild(preview, mesh, handles, selectionBox)
+  return { partId: part.id, container, preview, mesh, handles, selectionBox, vertices: part.mesh.vertices.map(v => ({ ...v })) }
 }
 
 type HandleMode = 'none' | 'deform' | 'mesh'
@@ -48,6 +49,7 @@ export function syncRuntimePart(rt: RuntimePart, part: Part, parameterValues: Re
   rt.mesh.geometry.indices = new Uint32Array(part.mesh.indices)
   rt.preview.visible = handleMode === 'mesh' && part.visible
   rt.handles.clear()
+  rt.selectionBox.clear()
   if (handleMode !== 'none' && part.visible) {
     const lineColor = handleMode === 'mesh' ? 0xffd36e : 0x20e0ff
     const handleColor = handleMode === 'mesh' ? 0xff8f33 : 0xffe066

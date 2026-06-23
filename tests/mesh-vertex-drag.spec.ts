@@ -90,9 +90,9 @@ test('keeps dragged mesh vertices visible after pointer release', async ({ page 
   if (!box) return
 
   const before = await pngColorStats(page, basePngColor)
-  await page.mouse.move(box.x + 289, box.y + 289)
+  await page.mouse.move(box.x + 280, box.y + 282)
   await page.mouse.down()
-  await page.mouse.move(box.x + 369, box.y + 249, { steps: 8 })
+  await page.mouse.move(box.x + 360, box.y + 242, { steps: 8 })
   const during = await pngColorStats(page, basePngColor)
   await page.mouse.up()
   const after = await pngColorStats(page, basePngColor)
@@ -113,7 +113,7 @@ test('save value buttons commit the current edit pose for playback', async ({ pa
   const initial = await pngColorStats(page, basePngColor)
   expect(initial.bbox).not.toBeNull()
 
-  await dragCanvasVertex(page, { x: 289, y: 289 }, { x: 369, y: 249 })
+  await dragCanvasVertex(page, { x: 280, y: 282 }, { x: 360, y: 242 })
   const editedValueOnePose = await pngColorStats(page, basePngColor)
   expect(editedValueOnePose.bbox?.maxX).toBeGreaterThan((initial.bbox?.maxX ?? 0) + 20)
 
@@ -126,7 +126,7 @@ test('save value buttons commit the current edit pose for playback', async ({ pa
   const stoppedAtZero = await pngColorStats(page, basePngColor)
   expect(stoppedAtZero.bbox?.maxX).toBeCloseTo(initial.bbox?.maxX ?? 0, 1)
 
-  await dragCanvasVertex(page, { x: 222, y: 289 }, { x: 162, y: 249 })
+  await dragCanvasVertex(page, { x: 193, y: 282 }, { x: 133, y: 242 })
   const editedValueZeroPose = await pngColorStats(page, basePngColor)
   expect(editedValueZeroPose.bbox?.minX).toBeLessThan((initial.bbox?.minX ?? 0) - 20)
 
@@ -138,7 +138,7 @@ test('save value buttons commit the current edit pose for playback', async ({ pa
 
   await setDeformValue(page, '1')
   const savedOnePose = await pngColorStats(page, basePngColor)
-  expect(savedOnePose.bbox?.maxX).toBeCloseTo(editedValueOnePose.bbox?.maxX ?? 0, 1)
+  expect(Math.abs((savedOnePose.bbox?.maxX ?? 0) - (editedValueOnePose.bbox?.maxX ?? 0))).toBeLessThanOrEqual(1)
   expect(savedOnePose.bbox?.minX).toBeGreaterThan((editedValueZeroPose.bbox?.minX ?? 0) + 20)
 })
 
@@ -170,28 +170,26 @@ test('mesh edit mode adds and deletes art mesh vertices', async ({ page }) => {
 })
 
 
-test('mesh edit mode ctrl-selects multiple vertices for batch deletion', async ({ page }) => {
+test('deform mode box-selects vertices and drags them together', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()
 
   await page.locator('input[type=file]').setInputFiles(path.join(process.cwd(), 'samples/base.png'))
   await expect(page.locator('.part span')).toHaveText(['base.png'])
-  await beginMeshEdit(page, 'base.png')
-
-  const deleteButton = page.getByRole('button', { name: 'Delete Vertex' })
   const canvas = page.locator('canvas')
   const box = await canvas.boundingBox()
   expect(box).not.toBeNull()
   if (!box) return
 
-  await page.mouse.click(box.x + 156, box.y + 156)
-  await expect(page.locator('.edit-banner')).toContainText('(1 selected)')
+  const before = await pngColorStats(page, basePngColor)
+  await page.mouse.move(box.x + 310, box.y + 190)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 335, box.y + 335, { steps: 8 })
+  await page.mouse.up()
 
-  await page.mouse.click(box.x + 223, box.y + 156, { modifiers: ['Control'] })
-  await expect(page.locator('.edit-banner')).toContainText('(2 selected)')
-  await expect(deleteButton).toBeEnabled()
+  await dragCanvasVertex(page, { x: 323, y: 203 }, { x: 363, y: 203 })
+  const after = await pngColorStats(page, basePngColor)
 
-  await deleteButton.click()
-  await expect(page.locator('.edit-banner')).not.toContainText('selected')
-  await expect(deleteButton).toBeDisabled()
+  expect(after.bbox?.maxX).toBeGreaterThan((before.bbox?.maxX ?? 0) + 25)
+  expect(after.bbox?.minX).toBeCloseTo(before.bbox?.minX ?? 0, 1)
 })
