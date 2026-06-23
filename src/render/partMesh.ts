@@ -35,7 +35,7 @@ export async function createRuntimePart(part: Part): Promise<RuntimePart> {
 
 type HandleMode = 'none' | 'deform' | 'mesh'
 
-export function syncRuntimePart(rt: RuntimePart, part: Part, parameterValues: Record<string, number>, handleMode: HandleMode, verticesOverride?: Vec2[], dimmed = false, selectedVertexIndex?: number) {
+export function syncRuntimePart(rt: RuntimePart, part: Part, parameterValues: Record<string, number>, handleMode: HandleMode, verticesOverride?: Vec2[], dimmed = false, selectedVertexIndices: number[] = []) {
   rt.container.position.set(part.transform.x, part.transform.y)
   rt.container.rotation = part.transform.rotation
   rt.container.scale.set(part.transform.scaleX, part.transform.scaleY)
@@ -55,7 +55,8 @@ export function syncRuntimePart(rt: RuntimePart, part: Part, parameterValues: Re
       const a = rt.vertices[part.mesh.indices[i]], b = rt.vertices[part.mesh.indices[i + 1]], c = rt.vertices[part.mesh.indices[i + 2]]
       rt.handles.moveTo(a.x, a.y).lineTo(b.x, b.y).lineTo(c.x, c.y).lineTo(a.x, a.y).stroke({ width: 1, color: lineColor, alpha: 0.9 })
     }
-    rt.vertices.forEach((v, i) => rt.handles.circle(v.x, v.y, i === selectedVertexIndex ? 7 : 5).fill({ color: i === selectedVertexIndex ? 0xffffff : handleColor }).stroke({ width: 1, color: 0x222222 }))
+    const selected = new Set(selectedVertexIndices)
+    rt.vertices.forEach((v, i) => rt.handles.circle(v.x, v.y, selected.has(i) ? 7 : 5).fill({ color: selected.has(i) ? 0xffffff : handleColor }).stroke({ width: 1, color: 0x222222 }))
   }
 }
 

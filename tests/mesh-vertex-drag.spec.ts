@@ -168,3 +168,30 @@ test('mesh edit mode adds and deletes art mesh vertices', async ({ page }) => {
   await deleteButton.click()
   await expect(deleteButton).toBeDisabled()
 })
+
+
+test('mesh edit mode ctrl-selects multiple vertices for batch deletion', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  await page.locator('input[type=file]').setInputFiles(path.join(process.cwd(), 'samples/base.png'))
+  await expect(page.locator('.part span')).toHaveText(['base.png'])
+  await beginMeshEdit(page, 'base.png')
+
+  const deleteButton = page.getByRole('button', { name: 'Delete Vertex' })
+  const canvas = page.locator('canvas')
+  const box = await canvas.boundingBox()
+  expect(box).not.toBeNull()
+  if (!box) return
+
+  await page.mouse.click(box.x + 156, box.y + 156)
+  await expect(page.locator('.edit-banner')).toContainText('(1 selected)')
+
+  await page.mouse.click(box.x + 223, box.y + 156, { modifiers: ['Control'] })
+  await expect(page.locator('.edit-banner')).toContainText('(2 selected)')
+  await expect(deleteButton).toBeEnabled()
+
+  await deleteButton.click()
+  await expect(page.locator('.edit-banner')).not.toContainText('selected')
+  await expect(deleteButton).toBeDisabled()
+})
