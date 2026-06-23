@@ -11,7 +11,7 @@ Lite2D は、PNG パーツを読み込んで簡易メッシュ変形を付け、
 - アートメッシュを起点にした頂点ドラッグによるキーフォーム変形
 - `ParamDeform` パラメータの値 `0` / `1` に対するキーフォーム保存
 - 1 秒、12 fps の簡易アニメーション再生
-- PNG スプライトシートと JSON メタデータの書き出し
+- PNG スプライトシートと JSON メタデータを含む ZIP の書き出し
 
 ## セットアップ
 
@@ -43,7 +43,7 @@ npm run dev -- --host 127.0.0.1
 8. 通常状態でメッシュ頂点をドラッグして、現在の `ParamDeform` 値に対する変形状態を調整します。
 9. `Parameters` パネルで `ParamDeform` の値を切り替えながら、`Save value=0` または `Save value=1` で変形状態を保存します。
 10. `Timeline` パネルの `Play` / `Stop` で変形アニメーションを確認します。
-11. 右上の `Export PNG SpriteSheet + JSON` から `spritesheet.png` と `spritesheet.json` を書き出します。
+11. 右上でフレーム数を指定し、`Export SpriteSheet ZIP` から `spritesheet.png` と `spritesheet.json` を含む `spritesheet.zip` を書き出します。
 
 ## サンプル
 

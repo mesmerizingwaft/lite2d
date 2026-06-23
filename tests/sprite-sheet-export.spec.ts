@@ -17,8 +17,27 @@ type SpriteSheetStats = {
   }[]
 }
 
-async function readSpriteSheetStats(page: import('@playwright/test').Page, pngPath: string): Promise<SpriteSheetStats> {
-  const png = await fs.readFile(pngPath)
+function unzipStoredEntries(zip: Buffer) {
+  const entries = new Map<string, Buffer>()
+  let offset = 0
+
+  while (offset + 4 <= zip.length && zip.readUInt32LE(offset) === 0x04034b50) {
+    const compression = zip.readUInt16LE(offset + 8)
+    const compressedSize = zip.readUInt32LE(offset + 18)
+    const filenameLength = zip.readUInt16LE(offset + 26)
+    const extraLength = zip.readUInt16LE(offset + 28)
+    const filenameStart = offset + 30
+    const dataStart = filenameStart + filenameLength + extraLength
+    const filename = zip.subarray(filenameStart, filenameStart + filenameLength).toString('utf8')
+    if (compression !== 0) throw new Error(`Unsupported ZIP compression method for ${filename}: ${compression}`)
+    entries.set(filename, zip.subarray(dataStart, dataStart + compressedSize))
+    offset = dataStart + compressedSize
+  }
+
+  return entries
+}
+
+async function readSpriteSheetStats(page: import('@playwright/test').Page, png: Buffer): Promise<SpriteSheetStats> {
   return page.evaluate(async base64 => {
     const image = new Image()
     const imageLoaded = new Promise<void>((resolve, reject) => {
@@ -86,7 +105,7 @@ async function readSpriteSheetStats(page: import('@playwright/test').Page, pngPa
     return {
       width: image.naturalWidth,
       height: image.naturalHeight,
-      frames: [0, 11].map(frameIndex => ({
+      frames: [0, 7].map(frameIndex => ({
         base: colorStats(frameIndex, [185, 122, 87]),
         object: colorStats(frameIndex, [136, 0, 21]),
         whitePixels: whitePixels(frameIndex),
@@ -95,7 +114,7 @@ async function readSpriteSheetStats(page: import('@playwright/test').Page, pngPa
   }, png.toString('base64'))
 }
 
-test('exports PNG spritesheet and JSON metadata with transparent PNG sample pixels', async ({ page }) => {
+test('exports ZIP containing PNG spritesheet and JSON metadata with transparent PNG sample pixels', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()
 
@@ -107,32 +126,32 @@ test('exports PNG spritesheet and JSON metadata with transparent PNG sample pixe
 
   const downloads: import('@playwright/test').Download[] = []
   page.on('download', download => downloads.push(download))
-  await page.getByRole('button', { name: 'Export PNG SpriteSheet + JSON' }).click()
-  await expect.poll(() => downloads.map(download => download.suggestedFilename()).sort()).toEqual(['spritesheet.json', 'spritesheet.png'])
+  await page.getByLabel('Sprite sheet frame count').fill('8')
+  await page.getByRole('button', { name: 'Export SpriteSheet ZIP' }).click()
+  await expect.poll(() => downloads.map(download => download.suggestedFilename())).toEqual(['spritesheet.zip'])
 
-  const pngDownload = downloads.find(download => download.suggestedFilename() === 'spritesheet.png')
-  const jsonDownload = downloads.find(download => download.suggestedFilename() === 'spritesheet.json')
-  expect(pngDownload, 'spritesheet.png download').toBeTruthy()
-  expect(jsonDownload, 'spritesheet.json download').toBeTruthy()
-  if (!pngDownload || !jsonDownload) return
+  const zipPath = await downloads[0].path()
+  expect(zipPath).toBeTruthy()
+  if (!zipPath) return
 
-  const jsonPath = await jsonDownload.path()
-  const pngPath = await pngDownload.path()
-  expect(jsonPath).toBeTruthy()
-  expect(pngPath).toBeTruthy()
-  if (!jsonPath || !pngPath) return
+  const entries = unzipStoredEntries(await fs.readFile(zipPath))
+  const json = entries.get('spritesheet.json')
+  const png = entries.get('spritesheet.png')
+  expect(json, 'spritesheet.json in ZIP').toBeTruthy()
+  expect(png, 'spritesheet.png in ZIP').toBeTruthy()
+  if (!json || !png) return
 
-  const meta = JSON.parse(await fs.readFile(jsonPath, 'utf8'))
+  const meta = JSON.parse(json.toString('utf8'))
   expect(meta).toEqual({
     image: 'spritesheet.png',
     frameWidth: 512,
     frameHeight: 512,
     fps: 12,
-    frames: 12,
+    frames: 8,
     columns: 6,
   })
 
-  const stats = await readSpriteSheetStats(page, pngPath)
+  const stats = await readSpriteSheetStats(page, png)
   expect(stats.width).toBe(512 * 6)
   expect(stats.height).toBe(512 * 2)
 
