@@ -18,7 +18,7 @@ async function togglePart(page: import('@playwright/test').Page, name: string) {
 }
 
 async function selectPart(page: import('@playwright/test').Page, name: string) {
-  await page.locator('.part', { has: page.locator('span', { hasText: name }) }).click()
+  await page.locator('.part span', { hasText: name }).click()
 }
 
 async function canvasStats(page: import('@playwright/test').Page): Promise<CanvasStats> {

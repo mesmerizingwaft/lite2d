@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useEditorStore } from '../editor/store'
 import type { Vec2 } from '../editor/types'
+import { rebuildMeshFromVertices } from '../mesh/rebuildMesh'
 import { createPixiApp } from './pixiApp'
 import { createRuntimePart, findHitVertex, syncRuntimePart, type RuntimePart } from './partMesh'
 
@@ -8,7 +9,7 @@ export function PixiViewport() {
   const host = useRef<HTMLDivElement>(null)
   const runtimes = useRef(new Map<string, RuntimePart>())
   const appRef = useRef<Awaited<ReturnType<typeof createPixiApp>> | null>(null)
-  const drag = useRef<{ partId: string; vertexIndex: number } | null>(null)
+  const drag = useRef<{ mode: 'mesh' | 'deform'; partId: string; vertexIndex: number } | null>(null)
   const store = useEditorStore()
 
   useEffect(() => {
@@ -22,21 +23,62 @@ export function PixiViewport() {
       app.ticker.add(tick)
     })
     const down = (e: PointerEvent) => {
-      const s = useEditorStore.getState(), p = s.parts.find(x => x.id === s.selectedPartId); if (!p) return
-      const rt = runtimes.current.get(p.id); if (!rt) return
+      const s = useEditorStore.getState()
+      if (s.isPlaying) return
+
+      const meshPart = s.parts.find(x => x.id === s.editingPartId)
+      if (meshPart) {
+        const rt = runtimes.current.get(meshPart.id); if (!rt) return
+        const local = rt.container.toLocal({ x: e.offsetX, y: e.offsetY } as Vec2)
+        const hit = findHitVertex(rt, { x: e.offsetX, y: e.offsetY })
+        if (hit != null) {
+          useEditorStore.getState().selectMeshVertex(hit)
+          drag.current = { mode: 'mesh', partId: meshPart.id, vertexIndex: hit }
+          app.canvas.setPointerCapture(e.pointerId)
+          return
+        }
+        const next = rebuildMeshFromVertices(meshPart.width, meshPart.height, [...meshPart.mesh.vertices, local])
+        const vertexIndex = next.vertices.length - 1
+        applyRuntimeMesh(rt, next.vertices, next.uvs, next.indices, vertexIndex)
+        useEditorStore.getState().updatePartMesh(meshPart.id, next, vertexIndex)
+        drag.current = { mode: 'mesh', partId: meshPart.id, vertexIndex }
+        app.canvas.setPointerCapture(e.pointerId)
+        return
+      }
+
+      const deformPart = s.parts.find(x => x.id === s.selectedPartId); if (!deformPart) return
+      const rt = runtimes.current.get(deformPart.id); if (!rt) return
       const hit = findHitVertex(rt, { x: e.offsetX, y: e.offsetY })
-      if (hit != null) { drag.current = { partId: p.id, vertexIndex: hit }; app.canvas.setPointerCapture(e.pointerId) }
+      if (hit != null) { drag.current = { mode: 'deform', partId: deformPart.id, vertexIndex: hit }; app.canvas.setPointerCapture(e.pointerId) }
     }
     const move = (e: PointerEvent) => {
       const d = drag.current; if (!d) return
       const rt = runtimes.current.get(d.partId); if (!rt) return
+      const part = useEditorStore.getState().parts.find(p => p.id === d.partId); if (!part) return
       const local = rt.container.toLocal({ x: e.offsetX, y: e.offsetY } as Vec2)
-      rt.vertices[d.vertexIndex] = { x: local.x, y: local.y }
-      rt.mesh.vertices = new Float32Array(rt.vertices.flatMap(v => [v.x, v.y]))
-      rt.handles.clear()
-      rt.vertices.forEach(v => rt.handles.circle(v.x, v.y, 5).fill({ color: 0xff8f33 }).stroke({ width: 1, color: 0x222222 }))
+      if (d.mode === 'mesh') {
+        const vertices = part.mesh.vertices.map((v, i) => i === d.vertexIndex ? local : v)
+        const next = rebuildMeshFromVertices(part.width, part.height, vertices)
+        applyRuntimeMesh(rt, next.vertices, next.uvs, next.indices, d.vertexIndex)
+      } else {
+        rt.vertices[d.vertexIndex] = { x: local.x, y: local.y }
+        rt.mesh.vertices = new Float32Array(rt.vertices.flatMap(v => [v.x, v.y]))
+        rt.handles.clear()
+        rt.vertices.forEach(v => rt.handles.circle(v.x, v.y, 5).fill({ color: 0xff8f33 }).stroke({ width: 1, color: 0x222222 }))
+      }
     }
-    const up = () => { const d = drag.current; if (d) { const rt = runtimes.current.get(d.partId); if (rt) useEditorStore.getState().updatePartVertices(d.partId, rt.vertices) } drag.current = null }
+    const up = () => {
+      const d = drag.current
+      if (d) {
+        const rt = runtimes.current.get(d.partId)
+        const part = useEditorStore.getState().parts.find(p => p.id === d.partId)
+        if (rt && part) {
+          if (d.mode === 'mesh') useEditorStore.getState().updatePartMesh(d.partId, rebuildMeshFromVertices(part.width, part.height, rt.vertices), d.vertexIndex)
+          else useEditorStore.getState().updatePartVertices(d.partId, rt.vertices)
+        }
+      }
+      drag.current = null
+    }
     const tick = () => {
       const s = useEditorStore.getState()
       if (s.isPlaying) s.setTime((s.currentTime + app.ticker.deltaMS / 1000) % s.animation.duration)
@@ -54,10 +96,30 @@ export function PixiViewport() {
         runtimes.current.set(part.id, rt); app.stage.addChild(rt.container)
       }
       for (const [id, rt] of runtimes.current) if (!store.parts.some(p => p.id === id)) { rt.container.destroy({ children: true }); runtimes.current.delete(id) }
-      store.parts.forEach(part => { const rt = runtimes.current.get(part.id); if (rt && !drag.current) syncRuntimePart(rt, part, store.parameterValues, part.id === store.selectedPartId, store.editVertices[part.id]) })
+      store.parts.forEach(part => {
+        const rt = runtimes.current.get(part.id)
+        const meshEditing = part.id === store.editingPartId
+        const deformEditing = !store.editingPartId && !store.isPlaying && part.id === store.selectedPartId
+        const handleMode = meshEditing ? 'mesh' : deformEditing ? 'deform' : 'none'
+        const vertices = meshEditing ? part.mesh.vertices : store.editVertices[part.id]
+        if (rt && !drag.current) syncRuntimePart(rt, part, store.parameterValues, handleMode, vertices, Boolean(store.editingPartId && !meshEditing), meshEditing ? store.selectedMeshVertexIndex : undefined)
+      })
     }
     run(); return () => { cancelled = true }
-  }, [store.parts, store.parameterValues, store.selectedPartId, store.editVertices])
+  }, [store.parts, store.parameterValues, store.selectedPartId, store.editingPartId, store.selectedMeshVertexIndex, store.editVertices, store.isPlaying])
 
   return <div className="viewport" ref={host} />
+}
+
+function applyRuntimeMesh(rt: RuntimePart, vertices: Vec2[], uvs: Vec2[], indices: number[], selectedVertexIndex?: number) {
+  rt.vertices = vertices.map(v => ({ ...v }))
+  rt.mesh.vertices = new Float32Array(rt.vertices.flatMap(v => [v.x, v.y]))
+  rt.mesh.geometry.uvs = new Float32Array(uvs.flatMap(v => [v.x, v.y]))
+  rt.mesh.geometry.indices = new Uint32Array(indices)
+  rt.handles.clear()
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = rt.vertices[indices[i]], b = rt.vertices[indices[i + 1]], c = rt.vertices[indices[i + 2]]
+    rt.handles.moveTo(a.x, a.y).lineTo(b.x, b.y).lineTo(c.x, c.y).lineTo(a.x, a.y).stroke({ width: 1, color: 0xffd36e, alpha: 0.9 })
+  }
+  rt.vertices.forEach((v, i) => rt.handles.circle(v.x, v.y, i === selectedVertexIndex ? 7 : 5).fill({ color: i === selectedVertexIndex ? 0xffffff : 0xff8f33 }).stroke({ width: 1, color: 0x222222 }))
 }

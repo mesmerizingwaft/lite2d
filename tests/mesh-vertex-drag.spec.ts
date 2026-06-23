@@ -71,6 +71,12 @@ async function dragCanvasVertex(page: import('@playwright/test').Page, from: { x
   await page.mouse.up()
 }
 
+async function beginMeshEdit(page: import('@playwright/test').Page, name: string) {
+  const row = page.locator('.part', { has: page.locator('span', { hasText: name }) })
+  await row.getByRole('button', { name: 'Edit' }).click()
+  await expect(page.locator('.edit-banner')).toContainText(`Editing mesh: ${name}`)
+}
+
 test('keeps dragged mesh vertices visible after pointer release', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()
@@ -134,4 +140,26 @@ test('save value buttons commit the current edit pose for playback', async ({ pa
   const savedOnePose = await pngColorStats(page, basePngColor)
   expect(savedOnePose.bbox?.maxX).toBeCloseTo(editedValueOnePose.bbox?.maxX ?? 0, 1)
   expect(savedOnePose.bbox?.minX).toBeGreaterThan((editedValueZeroPose.bbox?.minX ?? 0) + 20)
+})
+
+test('mesh edit mode adds and deletes art mesh vertices', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  await page.locator('input[type=file]').setInputFiles(path.join(process.cwd(), 'samples/base.png'))
+  await expect(page.locator('.part span')).toHaveText(['base.png'])
+  await beginMeshEdit(page, 'base.png')
+
+  const deleteButton = page.getByRole('button', { name: 'Delete Vertex' })
+  await expect(deleteButton).toBeDisabled()
+
+  const canvas = page.locator('canvas')
+  const box = await canvas.boundingBox()
+  expect(box).not.toBeNull()
+  if (!box) return
+
+  await page.mouse.click(box.x + 256, box.y + 220)
+  await expect(deleteButton).toBeEnabled()
+  await deleteButton.click()
+  await expect(deleteButton).toBeDisabled()
 })

@@ -15,7 +15,7 @@ export async function exportSpriteSheet(project: Project, frameWidth = 512, fram
   runtimes.forEach(rt => app.stage.addChild(rt.container))
   for (let f = 0; f < frames; f++) {
     const values = { ...project.parameterValues, ...evaluateAnimation(project.animation, f / project.animation.fps) }
-    project.parts.forEach(p => { const rt = runtimes.find(r => r.partId === p.id); if (rt) syncRuntimePart(rt, p, values, false) })
+    project.parts.forEach(p => { const rt = runtimes.find(r => r.partId === p.id); if (rt) syncRuntimePart(rt, p, values, 'none') })
     app.renderer.render(app.stage)
     ctx.drawImage(app.canvas, (f % columns) * frameWidth, Math.floor(f / columns) * frameHeight)
   }
