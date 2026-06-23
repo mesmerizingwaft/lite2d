@@ -158,6 +158,11 @@ test('mesh edit mode adds and deletes art mesh vertices', async ({ page }) => {
   expect(box).not.toBeNull()
   if (!box) return
 
+  await page.mouse.click(box.x + 156, box.y + 156)
+  await expect(deleteButton).toBeEnabled()
+  await deleteButton.click()
+  await expect(deleteButton).toBeDisabled()
+
   await page.mouse.click(box.x + 256, box.y + 220)
   await expect(deleteButton).toBeEnabled()
   await deleteButton.click()

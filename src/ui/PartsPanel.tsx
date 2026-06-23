@@ -19,10 +19,5 @@ export function PartsPanel() {
 }
 
 function canDeleteMeshVertex(part: Part, index: number) {
-  if (part.mesh.vertices.length <= 4) return false
-  const vertex = part.mesh.vertices[index]
-  if (!vertex) return false
-  const isCornerX = Math.abs(vertex.x) < 0.5 || Math.abs(vertex.x - part.width) < 0.5
-  const isCornerY = Math.abs(vertex.y) < 0.5 || Math.abs(vertex.y - part.height) < 0.5
-  return !(isCornerX && isCornerY)
+  return part.mesh.vertices.length > 3 && index >= 0 && index < part.mesh.vertices.length
 }

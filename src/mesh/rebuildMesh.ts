@@ -73,12 +73,6 @@ export function rebuildMeshFromVertices(width: number, height: number, vertices:
     x: Math.max(0, Math.min(width, vertex.x)),
     y: Math.max(0, Math.min(height, vertex.y)),
   }))
-  const corners = [{ x: 0, y: 0 }, { x: width, y: 0 }, { x: 0, y: height }, { x: width, y: height }]
-  for (const corner of corners) {
-    if (!clamped.some(vertex => Math.abs(vertex.x - corner.x) < 0.5 && Math.abs(vertex.y - corner.y) < 0.5)) {
-      clamped.push(corner)
-    }
-  }
   return {
     vertices: clamped,
     uvs: clamped.map(vertex => ({ x: width ? vertex.x / width : 0, y: height ? vertex.y / height : 0 })),
